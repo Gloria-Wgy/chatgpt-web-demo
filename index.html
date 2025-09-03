@@ -29,9 +29,9 @@
 <h2>Face Swap Demo</h2>
 <input type="file" id="source" accept="image/*">
 <input type="file" id="target" accept="image/*">
-<button onclick="uploadImages()">生成换脸图</button>
+<button onclick="uploadImages()">上传换脸</button>
 <br>
-<img id="result" style="max-width:300px; margin-top:10px;" />
+<img id="result" style="max-width:300px;">
 
 <script>
 async function uploadImages() {
@@ -46,12 +46,13 @@ async function uploadImages() {
   formData.append("source", source);
   formData.append("target", target);
 
-  const res = await fetch("https://你的-vercel-后端地址/api/faceswap", {
+  const res = await fetch("https://你的vercel后端地址/api/faceswap", {
     method: "POST",
     body: formData
   });
 
   const data = await res.json();
-  document.getElementById("result").src = data.url;
+  console.log(data); // 调试看看
+  document.getElementById("result").src = data.url || data.data?.[0]?.url || "";
 }
 </script>
