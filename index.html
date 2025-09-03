@@ -17,40 +17,24 @@
 <p class="p1"><span class="s1">&lt;html lang="zh-CN"&gt;</span></p>
 <p class="p1"><span class="s1">&lt;head&gt;</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>&lt;meta charset="UTF-8"&gt;</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>&lt;title&gt;ChatGPT 网页 Demo&lt;/title&gt;</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>&lt;style&gt;</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>body { font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 20px; }</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>#chat { border: 1px solid #ccc; padding: 10px; height: 400px; overflow-y: scroll; }</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>.msg { margin: 5px 0; }</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>.user { color: blue; }</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>.bot { color: green; }</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>&lt;/style&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>&lt;title&gt;ChatGPT Web Demo&lt;/title&gt;</span></p>
 <p class="p1"><span class="s1">&lt;/head&gt;</span></p>
 <p class="p1"><span class="s1">&lt;body&gt;</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>&lt;h2&gt;和 ChatGPT 聊天&lt;/h2&gt;</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>&lt;div id="chat"&gt;&lt;/div&gt;</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>&lt;input id="input" type="text" placeholder="输入内容..." style="width: 80%;"&gt;</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>&lt;button onclick="sendMessage()"&gt;发送&lt;/button&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>&lt;h1&gt;ChatGPT Demo&lt;/h1&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>&lt;textarea id="prompt" placeholder="输入你的问题"&gt;&lt;/textarea&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>&lt;button onclick="sendPrompt()"&gt;发送&lt;/button&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>&lt;div id="response"&gt;&lt;/div&gt;</span></p>
 <p class="p2"><span class="s1"></span><br></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>&lt;script&gt;</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>async function sendMessage() {</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>const input = document.getElementById("input");</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>const chat = document.getElementById("chat");</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>const text = input.value;</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>if (!text) return;</span></p>
-<p class="p2"><span class="s1"></span><br></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>chat.innerHTML += `&lt;div class="msg user"&gt;你: ${text}&lt;/div&gt;`;</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>input.value = "";</span></p>
-<p class="p2"><span class="s1"></span><br></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>const response = await fetch("https://chatgpt-web-demo-bay.vercel.app/api/chat", {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>async function sendPrompt() {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>const prompt = document.getElementById("prompt").value;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>const res = await fetch("https://chatgpt-web-demo-bay.vercel.app/api/chat", {</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>method: "POST",</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>headers: { "Content-Type": "application/json" },</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>body: JSON.stringify({ message: text })</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>body: JSON.stringify({ prompt })</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>});</span></p>
-<p class="p2"><span class="s1"></span><br></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>const data = await response.json();</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>chat.innerHTML += `&lt;div class="msg bot"&gt;GPT: ${data.reply}&lt;/div&gt;`;</span></p>
-<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>chat.scrollTop = chat.scrollHeight;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>const data = await res.json();</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>document.getElementById("response").innerText = data.reply;</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>}</span></p>
 <p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>&lt;/script&gt;</span></p>
 <p class="p1"><span class="s1">&lt;/body&gt;</span></p>
