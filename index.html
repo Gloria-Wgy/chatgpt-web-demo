@@ -26,3 +26,32 @@
   </script>
 </body>
 </html>
+<h2>Face Swap Demo</h2>
+<input type="file" id="source" accept="image/*">
+<input type="file" id="target" accept="image/*">
+<button onclick="uploadImages()">生成换脸图</button>
+<br>
+<img id="result" style="max-width:300px; margin-top:10px;" />
+
+<script>
+async function uploadImages() {
+  const source = document.getElementById("source").files[0];
+  const target = document.getElementById("target").files[0];
+  if (!source || !target) {
+    alert("请选择两张图片");
+    return;
+  }
+
+  const formData = new FormData();
+  formData.append("source", source);
+  formData.append("target", target);
+
+  const res = await fetch("https://你的-vercel-后端地址/api/faceswap", {
+    method: "POST",
+    body: formData
+  });
+
+  const data = await res.json();
+  document.getElementById("result").src = data.url;
+}
+</script>
