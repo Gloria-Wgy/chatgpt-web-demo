@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>ChatGPT Web Demo</title>
+</head>
+<body>
+  <h1>ChatGPT Demo</h1>
+  <textarea id="prompt" placeholder="输入你的问题"></textarea>
+  <br>
+  <button onclick="sendPrompt()">发送</button>
+  <div id="response"></div>
+
+  <script>
+    async function sendPrompt() {
+      const prompt = document.getElementById("prompt").value;
+      const res = await fetch("https://chatgpt-web-demo-alpha.vercel.app/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt })
+      });
+
+      const data = await res.json();
+      document.getElementById("response").innerText = data.reply || data.text || "(无返回)";
+    }
+  </script>
+</body>
+</html>
+<h2>Face Swap Demo</h2>
+<input type="file" id="source" accept="image/*">
+<input type="file" id="target" accept="image/*">
+<button onclick="uploadImages()">上传换脸</button>
+<br>
+<img id="result" style="max-width:300px;">
+
+<script>
+async function uploadImages() {
+  const source = document.getElementById("source").files[0];
+  const target = document.getElementById("target").files[0];
+  if (!source || !target) {
+    alert("请选择两张图片");
+    return;
+  }
+
+  const formData = new FormData();
+  formData.append("source", source);
+  formData.append("target", target);
+
+  const res = await fetch("https://chatgpt-web-demo-alpha.vercel.app/api/faceswap", {
+    method: "POST",
+    body: formData
+  });
+
+  const data = await res.json();
+  console.log(data); // 调试看看
+  document.getElementById("result").src = data.url || data.data?.[0]?.url || "";
+}
+</script>
