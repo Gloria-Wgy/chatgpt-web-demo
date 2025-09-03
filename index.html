@@ -14,7 +14,7 @@
   <script>
     async function sendPrompt() {
       const prompt = document.getElementById("prompt").value;
-      const res = await fetch("https://chatgpt-web-demo.vercel.app/api/chat", {
+      const res = await fetch("https://chatgpt-web-demo-alpha.vercel.app/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ prompt })
@@ -46,7 +46,7 @@ async function uploadImages() {
   formData.append("source", source);
   formData.append("target", target);
 
-  const res = await fetch("https://chatgpt-web-demo.vercel.app/api/faceswap", {
+  const res = await fetch("https://chatgpt-web-demo-alpha.vercel.app/api/faceswap", {
     method: "POST",
     body: formData
   });
