@@ -2,68 +2,64 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8" />
-  <title>Face Swap Demo</title>
+  <title>Face Swap 批量生成</title>
   <style>
     body { font-family: Arial, sans-serif; padding: 20px; }
-    button { margin-top: 10px; padding: 8px 16px; }
-    img { margin-top: 16px; max-width: 420px; display: block; }
-    #log { color: #666; white-space: pre-wrap; margin-top: 8px; }
-    .box { border:1px solid #ddd; padding:12px; border-radius:8px; }
+    .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+    .card { border: 1px solid #ddd; padding: 8px; border-radius: 8px; }
+    img { width: 100%; border-radius: 6px; }
   </style>
 </head>
 <body>
-  <h1>Face Swap Demo</h1>
+  <h1>Face Swap 批量生成（10 场景）</h1>
+  <p>上传两张你的照片（正脸/侧脸更佳），点击生成，将替换到我预置的10张场景人物上。</p>
 
-  <div class="box">
-    <p>上传两张图片进行换脸（源图 & 目标脸）：</p>
-    <input type="file" id="source" accept="image/*"> 源图<br><br>
-    <input type="file" id="target" accept="image/*"> 目标脸<br><br>
-    <button id="go">生成换脸图</button>
-    <div id="log"></div>
-  </div>
+  <input type="file" id="source" accept="image/*"> 源脸1<br><br>
+  <input type="file" id="target" accept="image/*"> 源脸2<br><br>
+  <button id="go">生成 10 张</button>
 
-  <h3>结果：</h3>
-  <img id="result" alt="结果图将显示在这里" />
+  <p id="status"></p>
+  <div id="gallery" class="grid"></div>
 
   <script>
-    // 改成你的 Vercel 域名
-    const API_BASE = "https://chatgpt-web-demo-alpha.vercel.app";
+    const API = "https://你的-vercel-域名.vercel.app/api/faceswap-batch";
 
     document.getElementById('go').onclick = async () => {
-      const source = document.getElementById('source').files[0];
-      const target = document.getElementById('target').files[0];
-      const log = document.getElementById('log');
-      const img = document.getElementById('result');
+      const s = document.getElementById('source').files[0];
+      const t = document.getElementById('target').files[0];
+      const status = document.getElementById('status');
+      const gallery = document.getElementById('gallery');
 
-      if (!source || !target) { alert('请先选择两张图片'); return; }
+      if (!s || !t) { alert('请上传两张源脸照片'); return; }
 
-      log.textContent = '正在上传并生成，请稍候…';
-      img.removeAttribute('src');
+      status.textContent = "正在生成 10 张，请稍候…（可能需要几十秒）";
+      gallery.innerHTML = "";
 
       const fd = new FormData();
-      fd.append('source', source);
-      fd.append('target', target);
+      fd.append("source", s);
+      fd.append("target", t);
 
       try {
-        const res = await fetch(`${API_BASE}/api/faceswap`, { method: 'POST', body: fd });
+        const res = await fetch(API, { method: "POST", body: fd });
         const data = await res.json();
 
-        // 在页面下方展示原始返回，方便排查
-        log.textContent = JSON.stringify(data, null, 2);
+        if (!data.images) {
+          status.textContent = "生成失败：" + (data.error || "无结果");
+          return;
+        }
 
-        if (data.url) {
-          img.src = data.url; // OpenAI 返回的临时 URL
-        } else if (data.b64) {
-          // 自动渲染回显 / b64_json
-          img.src = `data:image/png;base64,${data.b64}`;
-        } else if (data.error) {
-          alert('生成失败：' + data.error);
-        } else {
-          alert('生成失败：未返回图片数据');
+        status.textContent = "生成完成 ✅";
+        for (const it of data.images) {
+          const card = document.createElement('div');
+          card.className = 'card';
+          card.innerHTML = `
+            <div style="font-size:12px;color:#555;margin-bottom:6px;">${it.scene}${it.note ? " · " + it.note : ""}</div>
+            <img src="data:image/png;base64,${it.b64}" />
+          `;
+          gallery.appendChild(card);
         }
       } catch (e) {
-        log.textContent = String(e);
-        alert('请求失败，请稍后再试');
+        status.textContent = "请求失败：" + e.message;
       }
     };
   </script>
