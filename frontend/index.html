@@ -2,45 +2,27 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
-  <title>ChatGPT + FaceSwap Demo</title>
+  <title>Face Swap Demo</title>
   <style>
     body { font-family: Arial, sans-serif; padding: 20px; }
-    textarea { width: 100%; height: 100px; }
-    button { margin: 10px 0; padding: 8px 16px; }
-    #response, #result { margin-top: 20px; }
+    button { margin-top: 10px; padding: 8px 16px; }
+    img { margin-top: 20px; max-width: 400px; }
   </style>
 </head>
 <body>
-  <h1>ChatGPT Demo</h1>
-  <textarea id="prompt" placeholder="输入你的问题"></textarea><br>
-  <button onclick="sendPrompt()">发送</button>
-  <div id="response">等待提问…</div>
-
   <h1>Face Swap Demo</h1>
-  <input type="file" id="source" accept="image/*">
-  <input type="file" id="target" accept="image/*">
+
+  <p>上传两张图片进行换脸：</p>
+  <input type="file" id="source" accept="image/*"> 源图<br><br>
+  <input type="file" id="target" accept="image/*"> 换脸目标<br><br>
+
   <button onclick="uploadImages()">生成换脸图</button>
-  <br>
-  <img id="result" style="max-width:400px; margin-top:10px;" />
+
+  <div id="status"></div>
+  <img id="result" />
 
   <script>
     const API_BASE = "https://chatgpt-web-demo-alpha.vercel.app"; // 换成你的 Vercel 域名
-
-    async function sendPrompt() {
-      const prompt = document.getElementById("prompt").value;
-      document.getElementById("response").innerText = "正在生成回复...";
-      try {
-        const res = await fetch(`${API_BASE}/api/chat`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ prompt })
-        });
-        const data = await res.json();
-        document.getElementById("response").innerText = data.reply || data.error;
-      } catch (err) {
-        document.getElementById("response").innerText = "请求失败";
-      }
-    }
 
     async function uploadImages() {
       const source = document.getElementById("source").files[0];
@@ -50,7 +32,9 @@
         return;
       }
 
+      document.getElementById("status").innerText = "正在生成，请稍候…";
       document.getElementById("result").src = "";
+
       const formData = new FormData();
       formData.append("source", source);
       formData.append("target", target);
@@ -62,12 +46,13 @@
         });
         const data = await res.json();
         if (data.url) {
+          document.getElementById("status").innerText = "生成完成 ✅";
           document.getElementById("result").src = data.url;
         } else {
-          alert("生成失败: " + data.error);
+          document.getElementById("status").innerText = "生成失败: " + data.error;
         }
       } catch (err) {
-        alert("请求失败: " + err.message);
+        document.getElementById("status").innerText = "请求失败: " + err.message;
       }
     }
   </script>
