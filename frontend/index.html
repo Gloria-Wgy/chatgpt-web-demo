@@ -8,20 +8,26 @@
     button { margin-top: 10px; padding: 8px 16px; }
     img { margin-top: 16px; max-width: 420px; display: block; }
     #log { color: #666; white-space: pre-wrap; margin-top: 8px; }
+    .box { border:1px solid #ddd; padding:12px; border-radius:8px; }
   </style>
 </head>
 <body>
   <h1>Face Swap Demo</h1>
-  <p>上传两张图片进行换脸（源图 & 目标脸）：</p>
-  <input type="file" id="source" accept="image/*"> 源图<br><br>
-  <input type="file" id="target" accept="image/*"> 目标脸<br><br>
-  <button id="go">生成换脸图</button>
 
-  <div id="log"></div>
+  <div class="box">
+    <p>上传两张图片进行换脸（源图 & 目标脸）：</p>
+    <input type="file" id="source" accept="image/*"> 源图<br><br>
+    <input type="file" id="target" accept="image/*"> 目标脸<br><br>
+    <button id="go">生成换脸图</button>
+    <div id="log"></div>
+  </div>
+
+  <h3>结果：</h3>
   <img id="result" alt="结果图将显示在这里" />
 
   <script>
-    const API_BASE = "https://chatgpt-web-demo-alpha.vercel.app"; // ← 改成你的 Vercel 域名
+    // 改成你的 Vercel 域名
+    const API_BASE = "https://chatgpt-web-demo-alpha.vercel.app";
 
     document.getElementById('go').onclick = async () => {
       const source = document.getElementById('source').files[0];
@@ -41,18 +47,23 @@
       try {
         const res = await fetch(`${API_BASE}/api/faceswap`, { method: 'POST', body: fd });
         const data = await res.json();
+
+        // 在页面下方展示原始返回，方便排查
         log.textContent = JSON.stringify(data, null, 2);
 
         if (data.url) {
-          img.src = data.url;                  // OpenAI 返回的临时 URL
+          img.src = data.url; // OpenAI 返回的临时 URL
         } else if (data.b64) {
-          img.src = `data:image/png;base64,${data.b64}`; // 回显/或 b64_json
+          // 自动渲染回显 / b64_json
+          img.src = `data:image/png;base64,${data.b64}`;
+        } else if (data.error) {
+          alert('生成失败：' + data.error);
         } else {
-          alert('生成失败：' + (data.error || '无数据'));
+          alert('生成失败：未返回图片数据');
         }
       } catch (e) {
         log.textContent = String(e);
-        alert('请求失败，请看控制台或稍后再试');
+        alert('请求失败，请稍后再试');
       }
     };
   </script>
