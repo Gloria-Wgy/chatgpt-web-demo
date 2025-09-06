@@ -4,7 +4,6 @@ import OpenAI from "openai";
 import formidable from "formidable";
 import fs from "fs";
 
-// 允许的前端域名
 const ALLOWED_ORIGINS = ["https://gloria-wgy.github.io"];
 
 function setCors(req, res) {
@@ -22,14 +21,20 @@ function setCors(req, res) {
   return false;
 }
 
-// 回显上传的源图/目标图
+// 统一把可能的数组/单个文件对象标准化成 { filepath, mimetype, originalFilename, size }
+function pickFile(f) {
+  if (!f) return null;
+  if (Array.isArray(f)) return f[0] || null;
+  return f;
+}
+
 function echoSource(files, res, note = "") {
   try {
-    const file = files?.source || files?.target;
-    if (!file) return res.status(400).json({ error: "No file received" });
+    const f = pickFile(files?.source) || pickFile(files?.target);
+    if (!f) return res.status(400).json({ error: "No file received" });
 
-    const filepath = file.filepath;
-    if (!fs.existsSync(filepath)) {
+    const filepath = f.filepath;
+    if (!filepath || !fs.existsSync(filepath)) {
       return res.status(500).json({ error: "Temp file not found" });
     }
 
@@ -49,15 +54,23 @@ export default async function handler(req, res) {
   }
 
   const form = formidable({
-    multiples: true,
-    keepExtensions: true,
-    uploadDir: "/tmp"   // Vercel 临时目录
+    multiples: true,        // 允许多个文件
+    keepExtensions: true,   // 保留扩展名
+    uploadDir: "/tmp"       // Vercel 的临时目录
   });
 
   form.parse(req, async (err, fields, files) => {
     if (err) return res.status(400).json({ error: "File upload error" });
 
-    // 如果没 Key 或 USE_ECHO=1 → 回显
+    // 打印一点日志（在 Vercel Functions 日志里可见）
+    try {
+      console.log("fields:", Object.keys(fields || {}));
+      console.log("files keys:", Object.keys(files || {}));
+      console.log("source is array?", Array.isArray(files?.source));
+      console.log("target is array?", Array.isArray(files?.target));
+    } catch {}
+
+    // 若无 Key 或开启回显模式，直接回显，先验证链路
     if (!process.env.OPENAI_API_KEY || process.env.USE_ECHO === "1") {
       return echoSource(files, res, "echo mode");
     }
@@ -65,21 +78,33 @@ export default async function handler(req, res) {
     try {
       const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-      const source = fs.createReadStream(files.source.filepath);
-      const target = fs.createReadStream(files.target.filepath);
+      const src = pickFile(files.source);
+      const tgt = pickFile(files.target);
+      if (!src || !tgt) return res.status(400).json({ error: "Both source and target are required" });
 
+      if (!fs.existsSync(src.filepath) || !fs.existsSync(tgt.filepath)) {
+        return res.status(500).json({ error: "Temp file not found" });
+      }
+
+      const sourceStream = fs.createReadStream(src.filepath);
+      const targetStream = fs.createReadStream(tgt.filepath);
+
+      // 提示：不同 SDK 版本图像参数名可能有差异；如报 400，请查看日志并按文档调整
       const result = await client.images.generate({
         model: "gpt-image-1",
-        prompt: "Swap the face in the first image with the face from the second image. Blend naturally.",
-        image: [source, target],
+        prompt: "Swap the face in the first image with the face from the second image. Blend tone and lighting naturally.",
+        image: [sourceStream, targetStream],
         size: "512x512",
-        response_format: "b64_json"   // 推荐直接返回 base64
+        response_format: "b64_json" // 直接要 base64，更稳定
       });
 
-      const b64 = result.data[0].b64_json;
-      res.status(200).json({ b64 });
+      const b64 = result?.data?.[0]?.b64_json;
+      if (!b64) return res.status(500).json({ error: "No image returned" });
+
+      return res.status(200).json({ b64 });
     } catch (e) {
-      console.error("faceswap error:", e.message);
+      console.error("faceswap error:", e?.message || e);
+      // 兜底回显，保证页面能看到图像
       return echoSource(files, res, "OpenAI error fallback");
     }
   });
