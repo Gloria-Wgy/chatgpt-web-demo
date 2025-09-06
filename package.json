@@ -1,10 +1,9 @@
 {
   "name": "chatgpt-web-demo",
   "version": "1.0.0",
-  "engines": {
-    "node": ">=18"
-  },
+  "engines": { "node": ">=18" },
   "dependencies": {
-    "openai": "^4.0.0"
+    "openai": "^4.0.0",
+    "formidable": "^3.5.1"
   }
 }
