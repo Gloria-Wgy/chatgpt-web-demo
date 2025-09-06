@@ -1,5 +1,5 @@
 {
-  "name": "chatgpt-web-demo",
+  "name": "face-swap-demo",
   "version": "1.0.0",
   "engines": { "node": ">=18" },
   "dependencies": {
