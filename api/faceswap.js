@@ -6,7 +6,7 @@ import fs from "fs";
 
 function setCors(req, res) {
   const origin = req.headers.origin;
-  const allowed = ["https://gloria-wgy.github.io"];
+  const allowed = ["https://gloria-wgy.github.io"]; // 允许 GitHub Pages 域名
   if (origin && allowed.includes(origin)) {
     res.setHeader("Access-Control-Allow-Origin", origin);
   }
@@ -34,11 +34,9 @@ export default async function handler(req, res) {
     try {
       const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-      // 读取上传的图片
       const source = fs.createReadStream(files.source.filepath);
       const target = fs.createReadStream(files.target.filepath);
 
-      // 调用 OpenAI 图像生成
       const result = await client.images.generate({
         model: "gpt-image-1",
         prompt: "Swap the face in the first image with the face from the second image. Blend naturally.",
