@@ -1,5 +1,5 @@
 {
-  "name": "face-swap-demo",
+  "name": "face-swap-batch",
   "version": "1.0.0",
   "engines": { "node": ">=18" },
   "dependencies": {
