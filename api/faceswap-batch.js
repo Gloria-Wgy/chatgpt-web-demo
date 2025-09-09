@@ -4,113 +4,91 @@ import OpenAI from "openai";
 import formidable from "formidable";
 import fs from "fs";
 import path from "path";
+import jwt from "jsonwebtoken";
+import crypto from "crypto";
+import Redis from "ioredis";
+const redis = new Redis(process.env.REDIS_URL);
 
-// 允许的前端域名（你的 GitHub Pages）
-const ALLOWED_ORIGINS = ["https://gloria-wgy.github.io"];
-
-// 你要批量处理的场景文件名（放在 /scenes 下）
-const SCENES = [
-  "beach.jpg","office.jpg","classroom.jpg","kitchen.jpg","forest.jpg",
-  "gym.jpg","wedding.jpg","nightmarket.jpg","ski.jpg","scifi.jpg"
-];
+const ALLOWED_ORIGINS = [process.env.FRONTEND_ORIGIN]; // 例如 https://yourdomain.com
+const SCENES = ["beach.jpg","office.jpg","classroom.jpg","kitchen.jpg","forest.jpg","gym.jpg","wedding.jpg","nightmarket.jpg","ski.jpg","scifi.jpg"];
 
 function setCors(req, res) {
   const origin = req.headers.origin;
-  if (origin && ALLOWED_ORIGINS.includes(origin)) {
-    res.setHeader("Access-Control-Allow-Origin", origin);
-  }
+  if (origin && ALLOWED_ORIGINS.includes(origin)) res.setHeader("Access-Control-Allow-Origin", origin);
   res.setHeader("Vary", "Origin");
   res.setHeader("Access-Control-Allow-Methods", "POST,OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type,Authorization");
   if (req.method === "OPTIONS") { res.status(204).end(); return true; }
   return false;
 }
-
-// 兼容 formidable 返回的数组/单对象
-const pickFile = (f) => (Array.isArray(f) ? f[0] : f) || null;
-
-// 读取项目内静态文件（Vercel 部署包是可读的）
-function tryReadLocalFile(...segments) {
-  const p = path.join(process.cwd(), ...segments);
-  if (fs.existsSync(p)) return fs.createReadStream(p);
-  return null;
-}
+const pickFile = f => (Array.isArray(f) ? f[0] : f) || null;
+const readLocal = (...segs) => {
+  const p = path.join(process.cwd(), ...segs);
+  return fs.existsSync(p) ? fs.createReadStream(p) : null;
+};
 
 export default async function handler(req, res) {
   if (setCors(req, res)) return;
-  if (req.method !== "POST") return res.status(405).json({ error: "Only POST allowed" });
+  if (req.method !== "POST") return res.status(405).json({ error:"Only POST" });
 
-  const form = formidable({ multiples: true, keepExtensions: true, uploadDir: "/tmp" });
+  // 1) 校验 token + 免费次数
+  const auth = req.headers.authorization || "";
+  const token = auth.startsWith("Bearer ") ? auth.slice(7) : req.query.token;
+  if (!token) return res.status(401).json({ error:"No token" });
 
+  let email;
+  try {
+    ({ email } = jwt.verify(token, process.env.JWT_SECRET));
+  } catch { return res.status(401).json({ error:"Invalid token" }); }
+
+  const key = "free_used:" + crypto.createHash("sha256").update(email).digest("hex");
+  const used = await redis.get(key);
+  if (used === "1") return res.status(403).json({ error:"Free chance already used" });
+
+  const form = formidable({ multiples: true, keepExtensions:true, uploadDir:"/tmp" });
   form.parse(req, async (err, fields, files) => {
-    if (err) return res.status(400).json({ error: "File upload error" });
-    try {
-      const src = pickFile(files.source);
-      const tgt = pickFile(files.target);
-      if (!src || !tgt) return res.status(400).json({ error: "Need two source photos: source & target" });
+    if (err) return res.status(400).json({ error:"File upload error" });
 
-      // 没额度时可设置 USE_ECHO=1，直接回显第一张源脸，便于链路验证
-      if (!process.env.OPENAI_API_KEY || process.env.USE_ECHO === "1") {
-        const b64 = fs.readFileSync(src.filepath).toString("base64");
-        return res.status(200).json({ images: SCENES.map(name => ({ scene: name, b64, note: "echo" })) });
+    const src = pickFile(files.source);
+    const tgt = pickFile(files.target);
+    if (!src || !tgt) return res.status(400).json({ error:"Need two photos" });
+
+    const results = [];
+    const echoB64 = fs.readFileSync(src.filepath).toString("base64");
+
+    // 2) 换脸：有 KEY 调 OpenAI，无 KEY/报错就回显
+    const client = process.env.OPENAI_API_KEY ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY }) : null;
+
+    for (const name of SCENES) {
+      const scene = readLocal("scenes", name); // 或改成从 URL 拉取
+      if (!scene) { results.push({ scene:name, b64: echoB64, note:"scene missing" }); continue; }
+
+      if (!client || process.env.USE_ECHO === "1") {
+        results.push({ scene:name, b64: echoB64, note:"echo" });
+        continue;
       }
-
-      const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-
-      // 用第一张源脸做参考（也可把两张都传入，提示里说明融合）
-      const sourceFaceStream = fs.createReadStream(src.filepath);
-      const secondFaceStream = fs.createReadStream(tgt.filepath);
-
-      const results = [];
-
-      // 逐张处理（也可以 Promise.all 并发，但容易触发限速/配额）
-      for (const sceneName of SCENES) {
-        const sceneStream = tryReadLocalFile("scenes", sceneName);
-        if (!sceneStream) {
-          // 找不到场景文件，就用回显兜底
-          const b64 = fs.readFileSync(src.filepath).toString("base64");
-          results.push({ scene: sceneName, b64, note: "scene missing, echo" });
-          continue;
-        }
-
-        // 可选 mask（与场景同名）
-        const maskStream = tryReadLocalFile("masks", sceneName.replace(path.extname(sceneName), ".png"));
-
-        try {
-          // 注意：不同 SDK 版本图像编辑参数名可能有差异：
-          // 有的用 images.generate(image:[...])，有的用 images.edits(image, mask, prompt)。
-          // 下面写法基于较新的 'images.generate' 语义；若报 400，请改用 images.edits。
-          const resp = await client.images.generate({
-            model: "gpt-image-1",
-            // 把参考脸（sourceFaceStream/secondFaceStream）作为“参考输入”，并让模型把场景里主要人物的脸替换为参考脸
-            prompt: "Replace the main person's face in the first scene image with the person from the reference photos. Preserve pose/body, blend skin tone and lighting naturally. High fidelity.",
-            // 传入顺序：场景图 + 两张参考脸
-            image: maskStream
-              ? [sceneStream, sourceFaceStream, secondFaceStream, maskStream]  // 带 mask（有些版本不支持 image[] + mask，请改用 edits）
-              : [sceneStream, sourceFaceStream, secondFaceStream],
-            size: "768x768",
-            response_format: "b64_json"
-          });
-
-          const b64 = resp?.data?.[0]?.b64_json;
-          if (!b64) {
-            // 没返回就兜底回显
-            const fallback = fs.readFileSync(src.filepath).toString("base64");
-            results.push({ scene: sceneName, b64: fallback, note: "no image returned, echo" });
-          } else {
-            results.push({ scene: sceneName, b64 });
-          }
-        } catch (e) {
-          console.error("scene fail:", sceneName, e?.message || e);
-          const fallback = fs.readFileSync(src.filepath).toString("base64");
-          results.push({ scene: sceneName, b64: fallback, note: "error fallback" });
-        }
+      try {
+        // ⚠️ 部分 SDK 需要用 images.edits；这里给出 generate 写法，若 400 请换成 edits
+        const r = await client.images.generate({
+          model: "gpt-image-1",
+          prompt: "Replace the main person's face in the scene with the person from the two reference photos. Natural blend, keep pose/body/lighting.",
+          image: [scene, fs.createReadStream(src.filepath), fs.createReadStream(tgt.filepath)],
+          size: "768x768",
+          response_format: "b64_json"
+        });
+        results.push({ scene:name, b64: r?.data?.[0]?.b64_json || echoB64 });
+      } catch (e) {
+        console.error("openai fail", name, e?.message);
+        results.push({ scene:name, b64: echoB64, note:"fallback" });
       }
-
-      return res.status(200).json({ images: results });
-    } catch (e) {
-      console.error("batch error:", e);
-      return res.status(500).json({ error: e?.message || "Server error" });
     }
+
+    // 3) 标记“已免费使用一次”
+    await redis.set(key, "1", "EX", 60 * 60 * 24 * 365); // 1 年有效（按需调整）
+
+    // 4) 清理上传临时文件（隐私）
+    try { fs.unlinkSync(src.filepath); fs.unlinkSync(tgt.filepath); } catch {}
+
+    return res.status(200).json({ images: results, email });
   });
 }
