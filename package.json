@@ -7,6 +7,6 @@
     "formidable": "^3.5.1",
     "pdfkit": "^0.15.0",
     "jsonwebtoken": "^9.0.2",
-    "ioredis": "^5.3.2"   // 用 Upstash Redis 可替换为 "@upstash/redis"
+    "@upstash/redis": "^1.31.6"
   }
 }
