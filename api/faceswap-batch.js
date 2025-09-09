@@ -9,7 +9,7 @@ import crypto from "crypto";
 import Redis from "ioredis";
 const redis = new Redis(process.env.REDIS_URL);
 
-const ALLOWED_ORIGINS = [process.env.FRONTEND_ORIGIN]; // 例如 https://yourdomain.com
+const ALLOWED_ORIGINS = ["https://chatgpt-web-demo-alpha.vercel.app"]; // 例如 https://yourdomain.com
 const SCENES = ["beach.jpg","office.jpg","classroom.jpg","kitchen.jpg","forest.jpg","gym.jpg","wedding.jpg","nightmarket.jpg","ski.jpg","scifi.jpg"];
 
 function setCors(req, res) {
