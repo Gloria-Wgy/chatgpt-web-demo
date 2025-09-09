@@ -1,0 +1,52 @@
+<input type="email" id="email" placeholder="输入邮箱获取免费资格"/>
+<button id="getLink">获取上传资格链接（MVP：直接返回）</button>
+
+<hr>
+
+<input type="file" id="source" accept="image/*"> 照片1
+<input type="file" id="target" accept="image/*"> 照片2
+<button id="go">生成 10 张并预览 PDF</button>
+
+<script>
+const API = "https://你的-vercel-app.vercel.app";
+let token = new URLSearchParams(location.search).get("token") || "";
+
+document.getElementById('getLink').onclick = async ()=>{
+  const email = document.getElementById('email').value;
+  const r = await fetch(`${API}/api/request-magic-link`,{
+    method:"POST", headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({ email })
+  });
+  const data = await r.json();
+  alert(`MVP：复制此链接并在新标签打开：\n${data.link}`);
+};
+
+document.getElementById('go').onclick = async ()=>{
+  if (!token) { alert("缺少上传资格（token）"); return; }
+
+  // 可先检查是否已用过免费
+  const c = await fetch(`${API}/api/check-free?token=${token}`).then(r=>r.json());
+  if (!c.ok) return alert("token 无效");
+  if (c.used) return alert("此邮箱的免费次数已用完");
+
+  const s = document.getElementById('source').files[0];
+  const t = document.getElementById('target').files[0];
+  if (!s || !t) return alert("请先选择两张照片");
+
+  const fd = new FormData();
+  fd.append("source", s);
+  fd.append("target", t);
+
+  const res = await fetch(`${API}/api/faceswap-batch?token=${token}`, { method:"POST", body: fd });
+  const data = await res.json();
+  if (!data.images) return alert("生成失败：" + (data.error || "未知"));
+  // 打 PDF 预览
+  const pdfRes = await fetch(`${API}/api/generate-pdf`, {
+    method:"POST", headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({ images: data.images, orderId: "free" })
+  });
+  const blob = await pdfRes.blob();
+  const url = URL.createObjectURL(blob);
+  window.open(url, "_blank");
+};
+</script>
